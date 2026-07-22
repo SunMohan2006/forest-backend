@@ -13,6 +13,8 @@ class ForestImageResponse(BaseModel):
     image_url: str
     original_name: Optional[str] = None
     file_size: Optional[int] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     uploaded_at: datetime
 
     class Config:

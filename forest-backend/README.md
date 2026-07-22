@@ -27,7 +27,7 @@
 | 数据库 | **SQLite**（默认）/ **MySQL**（可选） | SQLite 免配置开箱即用，生产环境切 MySQL |
 | ORM | **SQLAlchemy 2.0** | 数据模型与表映射 |
 | 认证 | **JWT** (python-jose) | 无状态令牌认证，24小时有效期 |
-| 密码加密 | **bcrypt** (passlib) | 密码加盐哈希存储，不保存明文 |
+| 密码加密 | **bcrypt** | 密码加盐哈希存储，不保存明文 |
 | 文件上传 | **python-multipart** | 遥感图片上传，UUID 防冲突命名 |
 | 前端 | **原生 HTML/CSS/JS** | 单文件 SPA，登录 → 数据管理 → 图片查看 |
 | API 文档 | **Swagger UI**（已汉化） | `/docs` 页面全中文，面试官打开即懂 |
@@ -37,25 +37,31 @@
 ## 🏗 系统架构
 
 ```
-┌──────────────────────────────────────────────┐
-│              前端管理页面 (/)                    │
-│     登录/注册 → 统计卡片 → 林地列表 → 图片管理      │
-├──────────────────────────────────────────────┤
-│          Swagger 接口文档 (/docs)               │
-│         全中文汉化，支持在线调试                     │
-├──────────────────────────────────────────────┤
-│              Router 路由层                      │
-│   👤 用户模块  🌲 林地管理  🖼 图片管理  📊 统计     │
-├──────────────────────────────────────────────┤
-│            Service 业务逻辑层                    │
-│   注册/登录 · 林地CRUD · 图片上传 · 权限校验        │
-├──────────────────────────────────────────────┤
-│         SQLAlchemy ORM 数据访问层               │
-├──────────────────────────────────────────────┤
-│        SQLite / MySQL 数据库                    │
-├──────────────────────────────────────────────┤
-│         本地文件存储 (uploads/)                   │
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│                前端管理页面 (/)                      │
+│       登录/注册 → 统计卡片 → 林地列表 → 图片管理        │
+├──────────────────────────────────────────────────┤
+│            Swagger 接口文档 (/docs)                 │
+│           全中文汉化，支持在线调试                       │
+├──────────────────────────────────────────────────┤
+│                Router 路由层                        │
+│     👤 用户模块  🌲 林地管理  🖼 图片管理  📊 统计      │
+├──────────────────────────────────────────────────┤
+│              Service 业务逻辑层                      │
+│     注册/登录 · 林地CRUD · 图片上传                   │
+│     ┌──────────────┐                               │
+│     │ _check_permission()  ← 权限校验（创建者/管理员）  │
+│     └──────────────┘                               │
+├──────────────────────────────────────────────────┤
+│           SQLAlchemy ORM 数据访问层                 │
+├──────────────────────────────────────────────────┤
+│          SQLite / MySQL 数据库                      │
+│   user · forest_land · forest_image · operation_log │
+│   🌲 tree_species · planting_year · canopy_density  │
+│   🛰 latitude · longitude（遥感图片地理坐标）         │
+├──────────────────────────────────────────────────┤
+│           本地文件存储 (uploads/)                     │
+└──────────────────────────────────────────────────┘
 ```
 
 ---
@@ -89,6 +95,9 @@ user (1) ──────< (N) forest_land (1) ──────< (N) forest_
 | area | DECIMAL(10,2) | 面积（亩） |
 | location | VARCHAR(255) | 地理位置 |
 | land_type | VARCHAR(50) | 用材林/防护林/经济林/薪炭林/特用林 |
+| tree_species | VARCHAR(100) | 🌲 主要树种（落叶松、杉木、杨树等） |
+| planting_year | INTEGER | 🌲 种植年份 |
+| canopy_density | DECIMAL(3,2) | 🌲 郁闭度（0.00~1.00） |
 | description | TEXT | 描述 |
 | status | VARCHAR(20) | ACTIVE / INACTIVE |
 | created_by | INTEGER FK→user.id | 创建人 |
@@ -104,6 +113,8 @@ user (1) ──────< (N) forest_land (1) ──────< (N) forest_
 | image_url | VARCHAR(500) | 图片存储路径 |
 | original_name | VARCHAR(255) | 原始文件名 |
 | file_size | INTEGER | 文件大小（字节） |
+| latitude | DECIMAL(9,6) | 🛰 纬度（WGS84 坐标） |
+| longitude | DECIMAL(9,6) | 🛰 经度（WGS84 坐标） |
 | uploaded_at | DATETIME | 上传时间 |
 
 ### operation_log — 操作日志表
@@ -173,6 +184,8 @@ user (1) ──────< (N) forest_land (1) ──────< (N) forest_
 |------|------|------|------|
 | GET | `/api/statistics/overview` | 林地总数/活跃数/图片总数 | 是 |
 | GET | `/api/statistics/by-type` | 按林地类型分布统计 | 是 |
+| GET | `/api/statistics/by-species` | 🌲 按树种分布统计（含总面积） | 是 |
+| GET | `/api/statistics/by-planting-year` | 🌲 按种植年份统计 | 是 |
 | GET | `/api/statistics/monthly-trend` | 近30天每日新增趋势 | 是 |
 
 ---
@@ -319,6 +332,14 @@ forest-backend/
 |------|-----------|----------|----------|
 | 7/22 下午 | **FastAPI 挂载顺序导致静态文件 404**：`/static/` 挂载在路由注册之后，浏览器访问 `/static/index.html` 返回 404 | FastAPI 的路由匹配是"先挂载先匹配"，`/docs` 自定义路由注册后，后面的 mount 可能被前面的 catch-all 拦截 | 把 `app.mount("/static", ...)` 挪到 `app.include_router(...)` 之前 |
 | 7/22 晚上 | **前端登录后需要刷新才显示管理界面**：`handleLogin` 成功后 `showMain()` 执行了但看不到效果 | CSS 里 `#mainContent` 默认 `display:none`，JS 里改成了 `style.display='block'`，但前面的 `loginPage` 只是加了 `hidden` class，DOM 渲染顺序问题 | `showMain` 里把 `loginPage` 加上 `hidden`、`mainContent` 设 `display:block`，确保互斥 |
+
+### 第五阶段：安全加固 + 性能优化 + 林业差异化（7 月 22 日）
+
+| 时间 | 遇到的问题 | 排查过程 | 解决方案 |
+|------|-----------|----------|----------|
+| 7/22 晚上 | **JWT SECRET_KEY 硬编码在代码里**：任何克隆项目的人都能看到 `config.py` 里的默认密钥，可伪造任意用户的 JWT | 想了三种方案：① 强制环境变量（新手不友好）；② 启动时随机生成（重启后所有用户被迫重新登录）；③ 随机生成 → 持久化文件（兼顾安全与体验） | 采用方案③：启动时按优先级取 `环境变量 > .secret_key 文件 > 随机生成写入文件`，`.secret_key` 已加入 .gitignore |
+| 7/22 晚上 | **林地列表查询性能差**：`page_query` 中每查一条林地就单独 `COUNT` 一次图片数，10 条 = 11 次数据库查询（经典 N+1 问题） | 用 SQLAlchemy 的 `func.count` + `group_by` 测试，确认可以一次查出所有 land_id 对应的图片数 | 先用 `land_id.in_()` 批量查出所有图片计数 → 存为 `{land_id: count}` 字典 → 循环中直接 `dict.get()`，11 次查询变 2 次 |
+| 7/22 晚上 | **项目缺乏林业特色**：程研指出把表名从 `forest_land` 换成 `student`、`land_type` 换成 `major` 代码零改动也能跑，跟"学生管理系统"没区别 | 查阅林业信息化资料，识别出三个林业核心维度：树种组成、林分年龄（种植年份）、郁闭度（林冠覆盖度）；遥感图片缺地理坐标无法体现空间属性 | 给 `forest_land` 加 `tree_species`/`planting_year`/`canopy_density` 三个字段；给 `forest_image` 加 `latitude`/`longitude`；新增 `by-species` 和 `by-planting-year` 两个林业统计接口 |
 
 ---
 

@@ -102,16 +102,30 @@ def page_query(db: Session, page: int = 1, page_size: int = 10,
         .all()
     )
 
+    # 批量查询图片数量（修复 N+1 问题：原来每条记录一次 COUNT，现改为一次查询搞定）
+    land_ids = [land.id for land in records]
+    image_counts = {}
+    if land_ids:
+        counts = (
+            db.query(ForestImage.land_id, func.count(ForestImage.id))
+            .filter(ForestImage.land_id.in_(land_ids))
+            .group_by(ForestImage.land_id)
+            .all()
+        )
+        image_counts = {land_id: cnt for land_id, cnt in counts}
+
     # 给每条记录附加图片数量
     result = []
     for land in records:
         land_dict = {
             "id": land.id, "name": land.name, "area": float(land.area) if land.area else None,
             "location": land.location, "land_type": land.land_type,
+            "tree_species": land.tree_species, "planting_year": land.planting_year,
+            "canopy_density": float(land.canopy_density) if land.canopy_density else None,
             "description": land.description, "status": land.status,
             "created_by": land.created_by, "created_at": land.created_at,
             "updated_at": land.updated_at,
-            "image_count": db.query(ForestImage).filter(ForestImage.land_id == land.id).count(),
+            "image_count": image_counts.get(land.id, 0),
         }
         result.append(land_dict)
 

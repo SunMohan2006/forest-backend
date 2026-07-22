@@ -35,6 +35,8 @@ def create_land(req: ForestLandCreate, db: Session = Depends(get_db),
         return success(data={
             "id": land.id, "name": land.name, "area": float(land.area) if land.area else None,
             "location": land.location, "land_type": land.land_type,
+            "tree_species": land.tree_species, "planting_year": land.planting_year,
+            "canopy_density": float(land.canopy_density) if land.canopy_density else None,
             "description": land.description, "status": land.status,
             "created_at": str(land.created_at),
         }, message="新增成功")
@@ -91,6 +93,8 @@ def get_land(land_id: int, db: Session = Depends(get_db),
     return success(data={
         "id": land.id, "name": land.name, "area": float(land.area) if land.area else None,
         "location": land.location, "land_type": land.land_type,
+        "tree_species": land.tree_species, "planting_year": land.planting_year,
+        "canopy_density": float(land.canopy_density) if land.canopy_density else None,
         "description": land.description, "status": land.status,
         "created_by": land.created_by,
         "created_at": str(land.created_at),
@@ -111,6 +115,8 @@ def update_land(land_id: int, req: ForestLandUpdate, db: Session = Depends(get_d
         return success(data={
             "id": land.id, "name": land.name, "area": float(land.area) if land.area else None,
             "location": land.location, "land_type": land.land_type,
+            "tree_species": land.tree_species, "planting_year": land.planting_year,
+            "canopy_density": float(land.canopy_density) if land.canopy_density else None,
             "description": land.description, "status": land.status,
             "updated_at": str(land.updated_at) if land.updated_at else None,
         }, message="修改成功")

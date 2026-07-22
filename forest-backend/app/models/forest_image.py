@@ -1,7 +1,7 @@
 """
 遥感图片模型 — 对应 forest_image 表
 """
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func
+from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey, func
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -14,6 +14,8 @@ class ForestImage(Base):
     image_url = Column(String(500), nullable=False, comment="图片存储路径")
     original_name = Column(String(255), comment="原始文件名")
     file_size = Column(Integer, comment="文件大小（字节）")
+    latitude = Column(Numeric(9, 6), comment="纬度（WGS84），如 40.058743")
+    longitude = Column(Numeric(9, 6), comment="经度（WGS84），如 116.283475")
     uploaded_at = Column(DateTime, server_default=func.now(), comment="上传时间")
 
     # 多对一：多张图片属于一个林地

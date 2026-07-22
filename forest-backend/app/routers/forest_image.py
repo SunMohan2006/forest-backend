@@ -1,7 +1,7 @@
 """
 遥感图片路由 — 上传、查看列表（需登录）
 """
-from fastapi import APIRouter, Depends, UploadFile, File
+from fastapi import APIRouter, Depends, UploadFile, File, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.middleware.auth import get_current_user
@@ -22,7 +22,10 @@ router = APIRouter(prefix="/api/forest-image", tags=["🖼 图片管理"])
 
 **上传后**：图片可通过 `/uploads/<文件名>` 直接访问
 """)
-async def upload_image(land_id: int, file: UploadFile = File(...),
+async def upload_image(land_id: int,
+                       file: UploadFile = File(...),
+                       latitude: float = Query(None, description="纬度"),
+                       longitude: float = Query(None, description="经度"),
                        db: Session = Depends(get_db),
                        current_user: dict = Depends(get_current_user)):
     allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/tiff"]
@@ -30,11 +33,14 @@ async def upload_image(land_id: int, file: UploadFile = File(...),
         return error(code=400, message=f"不支持的文件类型: {file.content_type}，仅支持 JPG/PNG/GIF/WebP/TIFF")
 
     try:
-        image = forest_image_service.upload(db, land_id, file, current_user["user_id"], current_user["role"])
+        image = forest_image_service.upload(db, land_id, file, current_user["user_id"], current_user["role"],
+                                             latitude=latitude, longitude=longitude)
         return success(data={
             "id": image.id, "land_id": image.land_id,
             "image_url": image.image_url, "original_name": image.original_name,
-            "file_size": image.file_size, "uploaded_at": str(image.uploaded_at),
+            "file_size": image.file_size, "latitude": float(image.latitude) if image.latitude else None,
+            "longitude": float(image.longitude) if image.longitude else None,
+            "uploaded_at": str(image.uploaded_at),
         }, message="上传成功")
     except ValueError as e:
         return error(code=404, message=str(e))
@@ -54,5 +60,8 @@ def list_images(land_id: int, db: Session = Depends(get_db),
     return success(data=[{
         "id": img.id, "land_id": img.land_id,
         "image_url": img.image_url, "original_name": img.original_name,
-        "file_size": img.file_size, "uploaded_at": str(img.uploaded_at),
+        "file_size": img.file_size,
+        "latitude": float(img.latitude) if img.latitude else None,
+        "longitude": float(img.longitude) if img.longitude else None,
+        "uploaded_at": str(img.uploaded_at),
     } for img in images])
