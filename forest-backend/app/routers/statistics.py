@@ -4,7 +4,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from app.database import get_db
 from app.middleware.auth import get_current_user
 from app.models.forest_land import ForestLand
@@ -114,3 +114,29 @@ def by_planting_year(db: Session = Depends(get_db),
         .all()
     )
     return success(data=[{"planting_year": r[0], "count": r[1]} for r in results])
+
+
+@router.get("/by-age", summary="按树龄分布统计",
+            description="""
+**功能说明**：按树龄区间统计林地数量。树龄 = 当前年份 - 种植年份。
+
+**树龄区间**：幼龄林(0~10年) / 中龄林(11~20年) / 近熟林(21~30年) / 成熟林(31~50年) / 过熟林(50年以上)
+
+**林业背景**：不同林龄阶段经营措施不同——幼龄期需抚育间伐，成熟期适宜主伐利用。
+""")
+def by_age(db: Session = Depends(get_db),
+           current_user: dict = Depends(get_current_user)):
+    current_year = date.today().year
+    lands = db.query(ForestLand.planting_year).filter(ForestLand.planting_year.isnot(None)).all()
+
+    age_groups = {"幼龄林(0~10年)": 0, "中龄林(11~20年)": 0, "近熟林(21~30年)": 0,
+                  "成熟林(31~50年)": 0, "过熟林(50年以上)": 0}
+    for (year,) in lands:
+        age = current_year - year
+        if age <= 10: age_groups["幼龄林(0~10年)"] += 1
+        elif age <= 20: age_groups["中龄林(11~20年)"] += 1
+        elif age <= 30: age_groups["近熟林(21~30年)"] += 1
+        elif age <= 50: age_groups["成熟林(31~50年)"] += 1
+        else: age_groups["过熟林(50年以上)"] += 1
+
+    return success(data=[{"age_group": k, "count": v} for k, v in age_groups.items()])

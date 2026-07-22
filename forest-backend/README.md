@@ -97,7 +97,7 @@ user (1) ──────< (N) forest_land (1) ──────< (N) forest_
 | land_type | VARCHAR(50) | 用材林/防护林/经济林/薪炭林/特用林 |
 | tree_species | VARCHAR(100) | 🌲 主要树种（落叶松、杉木、杨树等） |
 | planting_year | INTEGER | 🌲 种植年份 |
-| canopy_density | DECIMAL(3,2) | 🌲 郁闭度（0.00~1.00） |
+| canopy_density | DECIMAL(3,2) | 🌲 郁闭度（0.00~1.00，<0.3疏林 / 0.3~0.7中度 / >0.7密林） |
 | description | TEXT | 描述 |
 | status | VARCHAR(20) | ACTIVE / INACTIVE |
 | created_by | INTEGER FK→user.id | 创建人 |
@@ -149,7 +149,7 @@ user (1) ──────< (N) forest_land (1) ──────< (N) forest_
 
 ---
 
-## 📡 API 接口清单（15 个）
+## 📡 API 接口清单（18 个）
 
 ### 👤 用户模块
 
@@ -186,6 +186,7 @@ user (1) ──────< (N) forest_land (1) ──────< (N) forest_
 | GET | `/api/statistics/by-type` | 按林地类型分布统计 | 是 |
 | GET | `/api/statistics/by-species` | 🌲 按树种分布统计（含总面积） | 是 |
 | GET | `/api/statistics/by-planting-year` | 🌲 按种植年份统计 | 是 |
+| GET | `/api/statistics/by-age` | 🌲 按树龄分布（幼/中/近/成/过熟林） | 是 |
 | GET | `/api/statistics/monthly-trend` | 近30天每日新增趋势 | 是 |
 
 ---
@@ -337,9 +338,10 @@ forest-backend/
 
 | 时间 | 遇到的问题 | 排查过程 | 解决方案 |
 |------|-----------|----------|----------|
-| 7/22 晚上 | **JWT SECRET_KEY 硬编码在代码里**：任何克隆项目的人都能看到 `config.py` 里的默认密钥，可伪造任意用户的 JWT | 想了三种方案：① 强制环境变量（新手不友好）；② 启动时随机生成（重启后所有用户被迫重新登录）；③ 随机生成 → 持久化文件（兼顾安全与体验） | 采用方案③：启动时按优先级取 `环境变量 > .secret_key 文件 > 随机生成写入文件`，`.secret_key` 已加入 .gitignore |
-| 7/22 晚上 | **林地列表查询性能差**：`page_query` 中每查一条林地就单独 `COUNT` 一次图片数，10 条 = 11 次数据库查询（经典 N+1 问题） | 用 SQLAlchemy 的 `func.count` + `group_by` 测试，确认可以一次查出所有 land_id 对应的图片数 | 先用 `land_id.in_()` 批量查出所有图片计数 → 存为 `{land_id: count}` 字典 → 循环中直接 `dict.get()`，11 次查询变 2 次 |
-| 7/22 晚上 | **项目缺乏林业特色**：程研指出把表名从 `forest_land` 换成 `student`、`land_type` 换成 `major` 代码零改动也能跑，跟"学生管理系统"没区别 | 查阅林业信息化资料，识别出三个林业核心维度：树种组成、林分年龄（种植年份）、郁闭度（林冠覆盖度）；遥感图片缺地理坐标无法体现空间属性 | 给 `forest_land` 加 `tree_species`/`planting_year`/`canopy_density` 三个字段；给 `forest_image` 加 `latitude`/`longitude`；新增 `by-species` 和 `by-planting-year` 两个林业统计接口 |
+| 7/22 下午 | **JWT SECRET_KEY 硬编码在代码里**：任何克隆项目的人都能看到 `config.py` 里的默认密钥，可伪造任意用户的 JWT | 想了三种方案：① 强制环境变量（新手不友好）；② 启动时随机生成（重启后所有用户被迫重新登录）；③ 随机生成 → 持久化文件（兼顾安全与体验） | 采用方案③：启动时按优先级取 `环境变量 > .secret_key 文件 > 随机生成写入文件`，`.secret_key` 已加入 .gitignore |
+| 7/22 傍晚 | **林地列表查询性能差**：`page_query` 中每查一条林地就单独 `COUNT` 一次图片数，10 条 = 11 次数据库查询（经典 N+1 问题） | 用 SQLAlchemy 的 `func.count` + `group_by` 测试，确认可以一次查出所有 land_id 对应的图片数 | 先用 `land_id.in_()` 批量查出所有图片计数 → 存为 `{land_id: count}` 字典 → 循环中直接 `dict.get()`，11 次查询变 2 次 |
+| 7/22 傍晚 | **项目缺乏林业特色**：程研指出把表名从 `forest_land` 换成 `student`、`land_type` 换成 `major` 代码零改动也能跑，跟"学生管理系统"没区别 | 查阅林业信息化资料，识别出三个林业核心维度：树种组成、林分年龄（种植年份）、郁闭度（林冠覆盖度）；遥感图片缺地理坐标无法体现空间属性 | 给 `forest_land` 加 `tree_species`/`planting_year`/`canopy_density` 三个字段；给 `forest_image` 加 `latitude`/`longitude`；新增 `by-species` 和 `by-planting-year` 两个林业统计接口 |
+| 7/22 深夜 | **程研评审：前端经纬度入口缺失 + 树龄没算 + README 接口数过时**：前端图片上传区域没有 lat/lng 输入框，后端能存但前端填不了；种植年份存了但没算树龄给用户看；README 标题写 15 个接口实际 18 个 | 图片弹窗加了经纬度两个输入框，上传时拼到 URL 参数；林地列表树种列显示"落叶松 (8年)"；新增 `by-age` 统计接口按林龄阶段（幼/中/近/成/过熟林）分组；README 接口数修正为 18，郁闭度加了林业参考值 | 经过程研两轮挑刺，项目的"林业味"从字段名升级到了可计算、可展示、可统计的程度 |
 
 ---
 

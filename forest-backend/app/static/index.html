@@ -182,6 +182,10 @@ tr:hover{background:#f9fbf9}
 <div class="modal-overlay" id="imgModal">
   <div class="modal" style="width:640px">
     <h3 id="imgModalTitle">林地图片</h3>
+    <div style="display:flex;gap:12px;margin-bottom:14px">
+      <input id="imgLat" placeholder="纬度（如 40.0587）" style="flex:1">
+      <input id="imgLng" placeholder="经度（如 116.2835）" style="flex:1">
+    </div>
     <div class="img-upload-area" onclick="document.getElementById('fileInput').click()">
       <p>📷 点击这里上传新图片</p>
       <p style="font-size:12px;color:#999">支持 JPG/PNG/GIF/WebP/TIFF，最大10MB</p>
@@ -336,7 +340,7 @@ async function loadLands() {
   tbody.innerHTML = records.map(l => `
     <tr>
       <td>${l.id}</td><td>${l.name}</td><td>${l.area||'-'}</td><td>${l.land_type||'-'}</td>
-      <td>${l.tree_species||'-'}</td><td>${l.location||'-'}</td>
+      <td>${l.tree_species?(l.tree_species+(l.planting_year?' ('+(new Date().getFullYear()-l.planting_year)+'年)':'')):'-'}</td><td>${l.location||'-'}</td>
       <td>${l.image_count||0} 张</td><td>${l.status==='ACTIVE'?'🟢 活跃':'⚪ 停用'}</td>
       <td>${(l.created_at||'').split('T')[0]}</td>
       <td class="actions">
@@ -427,7 +431,10 @@ async function loadImages() {
   const res = await api(`/api/forest-image/land/${currentLandId}`);
   const grid = document.getElementById('imgGrid');
   if (!res.data||!res.data.length) { grid.innerHTML='<p style="color:#999;text-align:center;grid-column:1/-1">暂无图片，点击上方区域上传</p>'; return; }
-  grid.innerHTML = res.data.map(img => `<img src="${img.image_url}" title="${img.original_name}" onclick="window.open('${img.image_url}')">`).join('');
+  grid.innerHTML = res.data.map(img => {
+    const coords = (img.latitude && img.longitude) ? `📍${img.latitude},${img.longitude}` : '';
+    return `<div style="text-align:center"><img src="${img.image_url}" title="${img.original_name}" onclick="window.open('${img.image_url}')"><div style="font-size:11px;color:#999;margin-top:2px">${coords}</div></div>`;
+  }).join('');
 }
 
 // ==================== 管理员功能 ====================
@@ -457,13 +464,22 @@ async function changeUserRole(userId, newRole, username) {
 async function uploadImage() {
   const file = document.getElementById('fileInput').files[0];
   if (!file) return;
+  const lat = document.getElementById('imgLat').value;
+  const lng = document.getElementById('imgLng').value;
+  let url = `${API}/api/forest-image/upload?land_id=${currentLandId}`;
+  if (lat) url += `&latitude=${lat}`;
+  if (lng) url += `&longitude=${lng}`;
   const formData = new FormData();
   formData.append('file', file);
-  const res = await fetch(`${API}/api/forest-image/upload?land_id=${currentLandId}`, {
+  const res = await fetch(url, {
     method: 'POST', headers: {'Authorization': 'Bearer '+token}, body: formData
   }).then(r=>r.json());
-  if (res.code === 200) { document.getElementById('fileInput').value=''; loadImages(); loadData(); }
-  else alert(res.message);
+  if (res.code === 200) {
+    document.getElementById('fileInput').value='';
+    document.getElementById('imgLat').value='';
+    document.getElementById('imgLng').value='';
+    loadImages(); loadData();
+  } else alert(res.message);
 }
 </script>
 </body>
