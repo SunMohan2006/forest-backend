@@ -6,8 +6,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.docs import get_swagger_ui_html
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 import os
+
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
 from app.database import engine, Base
 from app.config import settings
@@ -53,7 +55,7 @@ app.add_middleware(
 )
 
 # ── 挂载静态文件 ──
-app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # ── 注册路由 ──
 app.include_router(user.router)
@@ -87,18 +89,33 @@ async def custom_swagger_ui_html(request: Request):
 
 @app.on_event("startup")
 def on_startup():
-    """应用启动时自动创建数据库表（表不存在则建）"""
+    """启动时建表 + 初始化管理员账号"""
     import app.models  # noqa: F401
     Base.metadata.create_all(bind=engine)
-    print("[OK] Database tables checked successfully")
+
+    # 初始化管理员账号（不存在则创建）
+    from app.database import SessionLocal
+    from app.models.user import User
+    import bcrypt
+    db = SessionLocal()
+    admin = db.query(User).filter(User.username == "admin").first()
+    if not admin:
+        admin = User(
+            username="admin",
+            password=bcrypt.hashpw("admin123".encode(), bcrypt.gensalt()).decode(),
+            role="ADMIN",
+        )
+        db.add(admin)
+        db.commit()
+        print("[OK] 管理员账号已创建: admin / admin123")
+    elif admin.role != "ADMIN":
+        admin.role = "ADMIN"
+        db.commit()
+        print("[OK] 管理员权限已修复")
+    db.close()
 
 
-@app.get("/", summary="项目首页")
+@app.get("/", summary="前端管理页面")
 def root():
-    """返回项目基本信息"""
-    return {
-        "project": "林业资源信息管理后台",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "author": "个人暑期项目 2026.7-2026.8",
-    }
+    """返回前端管理页面（登录 → 林地管理 → 图片查看）"""
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))

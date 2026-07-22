@@ -12,12 +12,16 @@ from app.models.operation_log import OperationLog
 from app.config import settings
 
 
-def upload(db: Session, land_id: int, file: UploadFile, user_id: int) -> ForestImage:
-    """上传遥感图片到指定林地"""
+def upload(db: Session, land_id: int, file: UploadFile, user_id: int, role: str) -> ForestImage:
+    """上传遥感图片到指定林地（需权限：林地创建者或管理员）"""
     # 校验林地存在
     land = db.query(ForestLand).filter(ForestLand.id == land_id).first()
     if not land:
         raise ValueError("林地不存在")
+
+    # 权限校验：管理员可操作所有，普通用户只能给自己创建的林地上传
+    if role != "ADMIN" and land.created_by != user_id:
+        raise PermissionError("无权上传：该林地由其他用户创建，只有创建者或管理员可以上传图片")
 
     # 生成唯一文件名，防止覆盖
     ext = os.path.splitext(file.filename)[1] if file.filename else ".jpg"

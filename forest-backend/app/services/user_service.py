@@ -54,3 +54,22 @@ def login(db: Session, username: str, password: str) -> dict:
             "created_at": user.created_at,
         },
     }
+
+
+def list_users(db: Session) -> list:
+    """管理员：获取所有用户列表（不含密码）"""
+    users = db.query(User).order_by(User.created_at.desc()).all()
+    return [{"id": u.id, "username": u.username, "role": u.role, "created_at": u.created_at} for u in users]
+
+
+def change_role(db: Session, user_id: int, new_role: str) -> User:
+    """管理员：修改用户角色"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise ValueError("用户不存在")
+    if new_role not in ("ADMIN", "USER"):
+        raise ValueError("角色只能是 ADMIN 或 USER")
+    user.role = new_role
+    db.commit()
+    db.refresh(user)
+    return user

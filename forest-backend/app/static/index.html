@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>林业资源信息管理后台</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f0f2f5;color:#333}
+/* 顶部导航 */
+.navbar{background:#2c5530;color:#fff;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between}
+.navbar h1{font-size:18px}
+.navbar .user{display:flex;align-items:center;gap:12px}
+.navbar .user button{background:#fff;color:#2c5530;border:none;padding:6px 16px;border-radius:4px;cursor:pointer}
+/* 登录页 */
+.login-box{max-width:400px;margin:80px auto;background:#fff;border-radius:12px;padding:40px;box-shadow:0 2px 12px rgba(0,0,0,0.08)}
+.login-box h2{text-align:center;margin-bottom:24px;color:#2c5530}
+.login-box .tabs{display:flex;margin-bottom:24px}
+.login-box .tab{flex:1;text-align:center;padding:10px;cursor:pointer;border-bottom:2px solid #eee;color:#999}
+.login-box .tab.active{border-color:#2c5530;color:#2c5530;font-weight:bold}
+.login-box input{width:100%;padding:12px;margin-bottom:16px;border:1px solid #ddd;border-radius:6px;font-size:14px}
+.login-box .btn{width:100%;padding:12px;background:#2c5530;color:#fff;border:none;border-radius:6px;font-size:16px;cursor:pointer}
+.login-box .btn:hover{opacity:0.9}
+.login-box .msg{padding:8px;margin-bottom:12px;border-radius:4px;font-size:14px;display:none}
+.login-box .msg.error{display:block;background:#fff2f0;color:#cf1322;border:1px solid #ffccc7}
+.login-box .msg.success{display:block;background:#f6ffed;color:#389e0d;border:1px solid #b7eb8f}
+/* 主内容 */
+.container{max-width:1200px;margin:0 auto;padding:24px}
+/* 统计卡片 */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:#fff;padding:20px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06);text-align:center}
+.stat-card .num{font-size:36px;font-weight:bold;color:#2c5530}
+.stat-card .label{font-size:14px;color:#999;margin-top:4px}
+/* 操作栏 */
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.toolbar input{padding:8px 12px;border:1px solid #ddd;border-radius:6px;width:240px;font-size:14px}
+.toolbar select{padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;margin-left:8px}
+.toolbar .btn-primary{padding:8px 20px;background:#2c5530;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px}
+/* 列表 */
+.table-wrap{background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+table{width:100%;border-collapse:collapse}
+th{background:#fafafa;padding:12px 16px;text-align:left;font-size:13px;color:#666;border-bottom:1px solid #eee}
+td{padding:12px 16px;font-size:14px;border-bottom:1px solid #f5f5f5}
+tr:hover{background:#f9fbf9}
+.actions button{padding:4px 12px;margin-right:4px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:13px}
+.actions .btn-view{color:#1890ff;border-color:#1890ff}
+.actions .btn-del{color:#cf1322;border-color:#cf1322}
+.actions .btn-img{color:#2c5530;border-color:#2c5530}
+/* 分页 */
+.pagination{display:flex;justify-content:center;align-items:center;gap:8px;padding:16px}
+.pagination button{padding:6px 12px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer}
+.pagination button:disabled{opacity:0.4;cursor:default}
+.pagination span{font-size:14px;color:#666}
+/* 弹窗 */
+.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.45);z-index:100;justify-content:center;align-items:center}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;border-radius:12px;padding:32px;width:480px;max-height:80vh;overflow-y:auto}
+.modal h3{margin-bottom:20px;color:#2c5530}
+.modal input,.modal textarea,.modal select{width:100%;padding:10px;margin-bottom:14px;border:1px solid #ddd;border-radius:6px;font-size:14px}
+.modal textarea{height:80px;resize:vertical}
+.modal .btn-row{display:flex;gap:12px;justify-content:flex-end}
+.modal .btn-row button{padding:8px 24px;border-radius:6px;border:none;cursor:pointer;font-size:14px}
+.modal .btn-save{background:#2c5530;color:#fff}
+.modal .btn-cancel{background:#f0f0f0;color:#666}
+/* 图片网格 */
+.img-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:12px 0}
+.img-grid img{width:100%;height:120px;object-fit:cover;border-radius:6px;cursor:pointer}
+.img-upload-area{border:2px dashed #ddd;border-radius:8px;padding:24px;text-align:center;margin-bottom:14px;cursor:pointer}
+.img-upload-area:hover{border-color:#2c5530}
+/* 隐藏 */
+.hidden{display:none !important}
+#mainContent{display:none}
+</style>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<nav class="navbar">
+  <h1>🌲 林业资源信息管理后台</h1>
+  <div class="user">
+    <span id="navUser"></span>
+    <button onclick="logout()">退出登录</button>
+  </div>
+</nav>
+
+<!-- 登录页 -->
+<div id="loginPage" class="login-box">
+  <h2>🌲 林业管理系统</h2>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('login')">登录</div>
+    <div class="tab" onclick="switchTab('register')">注册</div>
+  </div>
+  <div id="msgBox" class="msg"></div>
+  <!-- 登录表单 -->
+  <form id="loginForm" onsubmit="handleLogin(event)">
+    <input id="loginUser" placeholder="用户名" required>
+    <input id="loginPass" type="password" placeholder="密码" required>
+    <button class="btn" type="submit">登 录</button>
+  </form>
+  <!-- 注册表单 -->
+  <form id="registerForm" class="hidden" onsubmit="handleRegister(event)">
+    <input id="regUser" placeholder="用户名（2-50个字符）" required>
+    <input id="regPass" type="password" placeholder="密码（至少6位）" required>
+    <button class="btn" type="submit">注 册</button>
+  </form>
+</div>
+
+<!-- 主内容 -->
+<div id="mainContent">
+  <div class="container">
+    <!-- 统计卡片 -->
+    <div class="stats">
+      <div class="stat-card"><div class="num" id="statTotal">0</div><div class="label">林地总数</div></div>
+      <div class="stat-card"><div class="num" id="statActive">0</div><div class="label">活跃林地</div></div>
+      <div class="stat-card"><div class="num" id="statImages">0</div><div class="label">遥感图片</div></div>
+      <div class="stat-card"><div class="num" id="statTypes">0</div><div class="label">林地类型</div></div>
+    </div>
+
+    <!-- 管理员面板 -->
+    <div id="adminPanel" style="display:none;background:#fff;border-radius:8px;padding:20px;margin-bottom:24px;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
+      <h3 style="margin-bottom:12px;color:#2c5530">🔑 管理员面板 — 用户管理</h3>
+      <table><thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>注册时间</th><th>操作</th></tr></thead>
+      <tbody id="adminUserTable"></tbody></table>
+    </div>
+
+    <!-- 操作栏 -->
+    <div class="toolbar">
+      <div>
+        <input id="searchKeyword" placeholder="搜索林地名称或位置..." onkeyup="search()">
+        <select id="searchType" onchange="search()">
+          <option value="">全部类型</option>
+          <option value="用材林">用材林</option>
+          <option value="防护林">防护林</option>
+          <option value="经济林">经济林</option>
+          <option value="薪炭林">薪炭林</option>
+          <option value="特用林">特用林</option>
+        </select>
+      </div>
+      <button class="btn-primary" onclick="openAddModal()">+ 新增林地</button>
+    </div>
+
+    <!-- 林地列表 -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>ID</th><th>名称</th><th>面积(亩)</th><th>类型</th><th>位置</th><th>图片</th><th>状态</th><th>创建时间</th><th>操作</th></tr>
+        </thead>
+        <tbody id="landTableBody"></tbody>
+      </table>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 新增/编辑弹窗 -->
+<div class="modal-overlay" id="landModal">
+  <div class="modal">
+    <h3 id="modalTitle">新增林地</h3>
+    <input id="landName" placeholder="林地名称 *">
+    <input id="landArea" type="number" step="0.01" placeholder="面积（亩）">
+    <input id="landLocation" placeholder="地理位置">
+    <select id="landType">
+      <option value="">选择类型</option>
+      <option value="用材林">用材林</option>
+      <option value="防护林">防护林</option>
+      <option value="经济林">经济林</option>
+      <option value="薪炭林">薪炭林</option>
+      <option value="特用林">特用林</option>
+    </select>
+    <textarea id="landDesc" placeholder="补充描述"></textarea>
+    <div class="btn-row">
+      <button class="btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn-save" onclick="saveLand()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 图片查看弹窗 -->
+<div class="modal-overlay" id="imgModal">
+  <div class="modal" style="width:640px">
+    <h3 id="imgModalTitle">林地图片</h3>
+    <div class="img-upload-area" onclick="document.getElementById('fileInput').click()">
+      <p>📷 点击这里上传新图片</p>
+      <p style="font-size:12px;color:#999">支持 JPG/PNG/GIF/WebP/TIFF，最大10MB</p>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="uploadImage()">
+    <div class="img-grid" id="imgGrid"></div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn-cancel" onclick="closeImgModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== 全局状态 ====================
+const API = '';
+let token = localStorage.getItem('token') || '';
+let currentUser = JSON.parse(localStorage.getItem('currentUser') || 'null');
+let currentPage = 1, editId = null, currentLandId = null;
+
+// ==================== 初始化 ====================
+if (token && currentUser) { showMain(); loadData(); }
+updateNav();
+
+// ==================== 登录/注册 ====================
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (tab==='login'&&i===0)||(tab==='register'&&i===1)));
+  document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('registerForm').classList.toggle('hidden', tab !== 'register');
+  document.getElementById('msgBox').className = 'msg';
+}
+
+async function api(path, method='GET', body=null) {
+  const headers = {'Content-Type':'application/json'};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const opts = {method, headers};
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const res = await fetch(API + path, opts);
+    const data = await res.json();
+    // FastAPI 422 验证错误：统一转成 {code, message} 格式
+    if (!data.code && data.detail) {
+      let msg = '';
+      if (Array.isArray(data.detail)) {
+        msg = data.detail.map(d => {
+          const field = (d.loc && d.loc[d.loc.length-1]) || '';
+          return field + ': ' + d.msg;
+        }).join('；');
+      } else {
+        msg = String(data.detail);
+      }
+      return {code: 422, message: msg};
+    }
+    return data;
+  } catch (e) {
+    return {code: 0, message: '网络连接失败：' + e.message};
+  }
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const username = document.getElementById('loginUser').value;
+  const password = document.getElementById('loginPass').value;
+  const res = await api('/api/user/login', 'POST', {username, password});
+  showMsg(res);
+  if (res.code === 200) {
+    token = res.data.token;
+    currentUser = res.data.user;
+    localStorage.setItem('token', token);
+    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    updateNav();
+    showMain(); loadData();
+  }
+}
+
+async function handleRegister(e) {
+  e.preventDefault();
+  const username = document.getElementById('regUser').value;
+  const password = document.getElementById('regPass').value;
+  const res = await api('/api/user/register', 'POST', {username, password});
+  showMsg(res);
+  if (res.code === 200) switchTab('login');
+}
+
+function showMsg(res) {
+  const box = document.getElementById('msgBox');
+  const isOk = res.code === 200;
+  box.className = 'msg ' + (isOk ? 'success' : 'error');
+  // 优先取 message，其次取 detail（FastAPI 422 验证错误），最后兜底
+  let msg = res.message;
+  if (!msg && res.detail) {
+    if (Array.isArray(res.detail)) {
+      msg = res.detail.map(d => d.msg || JSON.stringify(d)).join('；');
+    } else {
+      msg = String(res.detail);
+    }
+  }
+  box.textContent = msg || '请求失败，请检查网络连接';
+}
+
+function showMain() {
+  document.getElementById('loginPage').classList.add('hidden');
+  document.getElementById('mainContent').style.display = 'block';
+}
+
+function updateNav() {
+  const nav = document.getElementById('navUser');
+  if (currentUser) {
+    const roleBadge = currentUser.role === 'ADMIN' ? ' 🔑管理员' : ' 👤普通用户';
+    nav.textContent = currentUser.username + roleBadge;
+  } else {
+    nav.textContent = '';
+  }
+  // 管理员面板
+  const adminPanel = document.getElementById('adminPanel');
+  if (adminPanel) adminPanel.style.display = (currentUser && currentUser.role === 'ADMIN') ? 'block' : 'none';
+}
+
+function logout() {
+  token = ''; currentUser = null;
+  localStorage.removeItem('token'); localStorage.removeItem('currentUser');
+  document.getElementById('loginPage').classList.remove('hidden');
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('navUser').textContent = '';
+  currentPage = 1;
+}
+
+// ==================== 数据加载 ====================
+async function loadData() {
+  // 统计
+  const overview = await api('/api/statistics/overview');
+  if (overview.code === 200) {
+    document.getElementById('statTotal').textContent = overview.data.total_lands;
+    document.getElementById('statActive').textContent = overview.data.active_lands;
+    document.getElementById('statImages').textContent = overview.data.total_images;
+  }
+  // 类型统计
+  const byType = await api('/api/statistics/by-type');
+  if (byType.code === 200) document.getElementById('statTypes').textContent = byType.data.length;
+  // 林地列表
+  loadLands();
+  // 管理员：加载用户列表
+  if (currentUser && currentUser.role === 'ADMIN') loadUsers();
+}
+
+async function loadLands() {
+  const keyword = document.getElementById('searchKeyword').value;
+  const land_type = document.getElementById('searchType').value;
+  const res = await api(`/api/forest-land/page?page=${currentPage}&page_size=10&keyword=${encodeURIComponent(keyword)}&land_type=${encodeURIComponent(land_type)}`);
+  if (res.code !== 200) return;
+  const {records, total, page, page_size} = res.data;
+  const tbody = document.getElementById('landTableBody');
+  tbody.innerHTML = records.map(l => `
+    <tr>
+      <td>${l.id}</td><td>${l.name}</td><td>${l.area||'-'}</td><td>${l.land_type||'-'}</td><td>${l.location||'-'}</td>
+      <td>${l.image_count||0} 张</td><td>${l.status==='ACTIVE'?'🟢 活跃':'⚪ 停用'}</td>
+      <td>${(l.created_at||'').split('T')[0]}</td>
+      <td class="actions">
+        <button class="btn-view" onclick="editLand(${l.id})">编辑</button>
+        <button class="btn-img" onclick="openImgModal(${l.id},'${l.name}')">图片</button>
+        <button class="btn-del" onclick="deleteLand(${l.id})">删除</button>
+      </td>
+    </tr>`).join('');
+
+  // 分页
+  const totalPages = Math.ceil(total/page_size);
+  document.getElementById('pagination').innerHTML = `
+    <button ${currentPage<=1?'disabled':''} onclick="goPage(${currentPage-1})">上一页</button>
+    <span>${currentPage} / ${totalPages}（共${total}条）</span>
+    <button ${currentPage>=totalPages?'disabled':''} onclick="goPage(${currentPage+1})">下一页</button>`;
+}
+
+function search() { currentPage = 1; loadLands(); }
+function goPage(p) { currentPage = p; loadLands(); }
+
+// ==================== 林地 CRUD ====================
+function openAddModal() { editId=null; document.getElementById('modalTitle').textContent='新增林地'; clearForm(); document.getElementById('landModal').classList.add('show'); }
+function closeModal() { document.getElementById('landModal').classList.remove('show'); }
+
+async function editLand(id) {
+  const res = await api(`/api/forest-land/${id}`);
+  if (res.code !== 200) return alert(res.message);
+  const l = res.data;
+  editId = id;
+  document.getElementById('modalTitle').textContent = '编辑林地';
+  document.getElementById('landName').value = l.name;
+  document.getElementById('landArea').value = l.area||'';
+  document.getElementById('landLocation').value = l.location||'';
+  document.getElementById('landType').value = l.land_type||'';
+  document.getElementById('landDesc').value = l.description||'';
+  document.getElementById('landModal').classList.add('show');
+}
+
+async function saveLand() {
+  const body = {
+    name: document.getElementById('landName').value,
+    area: parseFloat(document.getElementById('landArea').value)||null,
+    location: document.getElementById('landLocation').value||null,
+    land_type: document.getElementById('landType').value||null,
+    description: document.getElementById('landDesc').value||null,
+  };
+  if (!body.name) return alert('林地名称不能为空');
+  const res = editId
+    ? await api(`/api/forest-land/${editId}`, 'PUT', body)
+    : await api('/api/forest-land', 'POST', body);
+  if (res.code === 200) { closeModal(); loadLands(); loadData(); }
+  else alert(res.message);
+}
+
+async function deleteLand(id) {
+  if (!confirm('确定删除该林地？删除后图片也会被删除，不可恢复！')) return;
+  const res = await api(`/api/forest-land/${id}`, 'DELETE');
+  if (res.code === 200) loadLands();
+  else alert(res.message);
+}
+function clearForm() {
+  document.getElementById('landName').value='';
+  document.getElementById('landArea').value='';
+  document.getElementById('landLocation').value='';
+  document.getElementById('landType').value='';
+  document.getElementById('landDesc').value='';
+}
+
+// ==================== 图片 ====================
+async function openImgModal(landId, name) {
+  currentLandId = landId;
+  document.getElementById('imgModalTitle').textContent = '📷 ' + name + ' - 遥感图片';
+  document.getElementById('imgModal').classList.add('show');
+  await loadImages();
+}
+function closeImgModal() { document.getElementById('imgModal').classList.remove('show'); currentLandId=null; }
+
+async function loadImages() {
+  const res = await api(`/api/forest-image/land/${currentLandId}`);
+  const grid = document.getElementById('imgGrid');
+  if (!res.data||!res.data.length) { grid.innerHTML='<p style="color:#999;text-align:center;grid-column:1/-1">暂无图片，点击上方区域上传</p>'; return; }
+  grid.innerHTML = res.data.map(img => `<img src="${img.image_url}" title="${img.original_name}" onclick="window.open('${img.image_url}')">`).join('');
+}
+
+// ==================== 管理员功能 ====================
+async function loadUsers() {
+  const res = await api('/api/user/list');
+  if (res.code !== 200) return;
+  const tbody = document.getElementById('adminUserTable');
+  tbody.innerHTML = res.data.map(u => `
+    <tr>
+      <td>${u.id}</td><td>${u.username}</td>
+      <td>${u.role==='ADMIN'?'🔑 管理员':'👤 普通用户'}</td>
+      <td>${(u.created_at||'').split('T')[0]}</td>
+      <td class="actions">
+        <button class="btn-view" onclick="changeUserRole(${u.id},'${u.role==='ADMIN'?'USER':'ADMIN'}','${u.username}')">
+          ${u.role==='ADMIN'?'降为普通用户':'升为管理员'}
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+async function changeUserRole(userId, newRole, username) {
+  if (!confirm(`确定将 ${username} 的角色改为 ${newRole==='ADMIN'?'管理员':'普通用户'}？`)) return;
+  const res = await api(`/api/user/${userId}/role?new_role=${newRole}`, 'PUT');
+  if (res.code === 200) { loadUsers(); } else { alert(res.message); }
+}
+
+async function uploadImage() {
+  const file = document.getElementById('fileInput').files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API}/api/forest-image/upload?land_id=${currentLandId}`, {
+    method: 'POST', headers: {'Authorization': 'Bearer '+token}, body: formData
+  }).then(r=>r.json());
+  if (res.code === 200) { document.getElementById('fileInput').value=''; loadImages(); loadData(); }
+  else alert(res.message);
+}
+</script>
+</body>
+</html>

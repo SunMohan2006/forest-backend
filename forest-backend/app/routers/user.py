@@ -1,9 +1,10 @@
 """
-用户路由 — 注册、登录（无需认证）
+用户路由 — 注册、登录、管理员用户管理
 """
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.middleware.auth import get_current_user
 from app.schemas.user import RegisterRequest, LoginRequest
 from app.services import user_service
 from app.utils.response import success, error
@@ -52,3 +53,28 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         return success(data=result, message="登录成功")
     except ValueError as e:
         return error(code=401, message=str(e))
+
+
+@router.get("/list", summary="用户列表（管理员）",
+            description="**权限要求**：管理员。返回所有注册用户的信息（不含密码）。")
+def list_users(db: Session = Depends(get_db),
+               current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "ADMIN":
+        return error(code=403, message="无权操作：仅管理员可查看用户列表")
+    users = user_service.list_users(db)
+    return success(data=users)
+
+
+@router.put("/{user_id}/role", summary="修改用户角色（管理员）",
+            description="**权限要求**：管理员。将指定用户的角色改为 ADMIN 或 USER。")
+def change_role(user_id: int, new_role: str,
+                db: Session = Depends(get_db),
+                current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "ADMIN":
+        return error(code=403, message="无权操作：仅管理员可修改用户角色")
+    try:
+        user = user_service.change_role(db, user_id, new_role)
+        return success(data={"id": user.id, "username": user.username, "role": user.role},
+                       message=f"已将 {user.username} 的角色改为 {user.role}")
+    except ValueError as e:
+        return error(code=400, message=str(e))

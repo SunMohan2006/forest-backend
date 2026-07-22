@@ -1,5 +1,5 @@
 """
-林地业务逻辑 — 增删改查、搜索
+林地业务逻辑 — 增删改查、搜索（含权限校验）
 """
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -9,6 +9,14 @@ from app.models.forest_image import ForestImage
 from app.models.operation_log import OperationLog
 
 
+def _check_permission(land: ForestLand, user_id: int, role: str, action: str) -> None:
+    """权限校验：管理员可操作所有，普通用户只能操作自己创建的"""
+    if role == "ADMIN":
+        return
+    if land.created_by != user_id:
+        raise PermissionError(f"无权{action}：该林地由其他用户创建，只有创建者或管理员可以{action}")
+
+
 def create(db: Session, data: dict, user_id: int) -> ForestLand:
     """新增林地，并记录操作日志"""
     land = ForestLand(**data, created_by=user_id)
@@ -16,7 +24,6 @@ def create(db: Session, data: dict, user_id: int) -> ForestLand:
     db.commit()
     db.refresh(land)
 
-    # 记录操作日志
     log = OperationLog(
         user_id=user_id, action="CREATE", target="forest_land",
         target_id=land.id, detail=f"新增林地: {land.name}"
@@ -27,11 +34,12 @@ def create(db: Session, data: dict, user_id: int) -> ForestLand:
     return land
 
 
-def update(db: Session, land_id: int, data: dict, user_id: int) -> ForestLand:
-    """修改林地信息"""
+def update(db: Session, land_id: int, data: dict, user_id: int, role: str) -> ForestLand:
+    """修改林地信息（需权限：创建者或管理员）"""
     land = db.query(ForestLand).filter(ForestLand.id == land_id).first()
     if not land:
         raise ValueError("林地不存在")
+    _check_permission(land, user_id, role, "修改")
 
     for key, value in data.items():
         if value is not None:
@@ -50,11 +58,12 @@ def update(db: Session, land_id: int, data: dict, user_id: int) -> ForestLand:
     return land
 
 
-def delete(db: Session, land_id: int, user_id: int) -> None:
-    """删除林地（级联删除关联图片）"""
+def delete(db: Session, land_id: int, user_id: int, role: str) -> None:
+    """删除林地（需权限：创建者或管理员，级联删除关联图片）"""
     land = db.query(ForestLand).filter(ForestLand.id == land_id).first()
     if not land:
         raise ValueError("林地不存在")
+    _check_permission(land, user_id, role, "删除")
 
     db.delete(land)
 

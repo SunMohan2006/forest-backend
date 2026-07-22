@@ -30,7 +30,7 @@ async def upload_image(land_id: int, file: UploadFile = File(...),
         return error(code=400, message=f"不支持的文件类型: {file.content_type}，仅支持 JPG/PNG/GIF/WebP/TIFF")
 
     try:
-        image = forest_image_service.upload(db, land_id, file, current_user["user_id"])
+        image = forest_image_service.upload(db, land_id, file, current_user["user_id"], current_user["role"])
         return success(data={
             "id": image.id, "land_id": image.land_id,
             "image_url": image.image_url, "original_name": image.original_name,
@@ -38,6 +38,8 @@ async def upload_image(land_id: int, file: UploadFile = File(...),
         }, message="上传成功")
     except ValueError as e:
         return error(code=404, message=str(e))
+    except PermissionError as e:
+        return error(code=403, message=str(e))
 
 
 @router.get("/land/{land_id}", summary="查看某林地的所有图片",

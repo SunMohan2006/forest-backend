@@ -107,7 +107,7 @@ def get_land(land_id: int, db: Session = Depends(get_db),
 def update_land(land_id: int, req: ForestLandUpdate, db: Session = Depends(get_db),
                 current_user: dict = Depends(get_current_user)):
     try:
-        land = forest_land_service.update(db, land_id, req.model_dump(exclude_none=True), current_user["user_id"])
+        land = forest_land_service.update(db, land_id, req.model_dump(exclude_none=True), current_user["user_id"], current_user["role"])
         return success(data={
             "id": land.id, "name": land.name, "area": float(land.area) if land.area else None,
             "location": land.location, "land_type": land.land_type,
@@ -116,6 +116,8 @@ def update_land(land_id: int, req: ForestLandUpdate, db: Session = Depends(get_d
         }, message="修改成功")
     except ValueError as e:
         return error(code=404, message=str(e))
+    except PermissionError as e:
+        return error(code=403, message=str(e))
 
 
 @router.delete("/{land_id}", summary="删除林地",
@@ -125,7 +127,9 @@ def update_land(land_id: int, req: ForestLandUpdate, db: Session = Depends(get_d
 def delete_land(land_id: int, db: Session = Depends(get_db),
                 current_user: dict = Depends(get_current_user)):
     try:
-        forest_land_service.delete(db, land_id, current_user["user_id"])
+        forest_land_service.delete(db, land_id, current_user["user_id"], current_user["role"])
         return success(message="删除成功")
     except ValueError as e:
         return error(code=404, message=str(e))
+    except PermissionError as e:
+        return error(code=403, message=str(e))
