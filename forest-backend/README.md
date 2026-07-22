@@ -287,16 +287,42 @@ forest-backend/
 
 ## 🐛 开发日志
 
-> 记录开发过程中遇到的问题和解决方案，这是面试时最能证明"你亲手写的"的部分。
+> 面试时这些踩坑细节最能证明项目是亲手写的——每个问题背后都是一段调试过程。
 
-| 日期 | 问题 | 解决方案 |
-|------|------|----------|
-| 2026-07-22 | 项目初始化：技术选型 | 最初考虑 Spring Boot，评估自身 Java 基础后改用更熟悉的 Python/FastAPI |
-| 2026-07-22 | 数据库免配置 | 默认使用 SQLite，通过 `DB_TYPE` 环境变量可选切换 MySQL |
-| 2026-07-22 | Swagger 英文界面不友好 | 注入自定义 JS 翻译全部标签为中文，自定义 `/docs` 路由 |
-| 2026-07-22 | 权限控制缺失 | 在 Service 层增加 `_check_permission()`，区分普通用户和管理员 |
+### 第一阶段：项目初始化（7 月 22 日）
 
-> 💡 继续开发时请持续补充此表——每个 Bug、每次优化都是一段故事，面试官最爱看这个。
+| 时间 | 遇到的问题 | 排查过程 | 解决方案 |
+|------|-----------|----------|----------|
+| 7/22 上午 | **技术栈选型纠结**：设计文档写了 Spring Boot，但自己 Java 基础不扎实 | 对比了 Spring Boot 和 FastAPI 的学习曲线、生态、API 文档生成能力 | 改用 Python/FastAPI，语法更熟，自动生成 Swagger 文档省了大量写文档的时间 |
+| 7/22 上午 | **`Column(BigInteger)` 导致 SQLite 报错**：SQLite 不支持 `BigInteger` 类型 | 查看 SQLAlchemy 文档发现 SQLite 的 INTEGER 最大就是 64 位有符号整数 | 将所有模型中的 `BigInteger` 改为 `Integer`，功能完全不变 |
+| 7/22 下午 | **`passlib` 库与 Python 3.14 不兼容**：`passlib.hash.bcrypt` 内部调用了已废弃的 API | 查了 passlib 的 GitHub issue，发现项目已多年未更新 | 改用原生 `bcrypt` 库直接调用 `hashpw()` / `checkpw()`，更底层更稳定 |
+| 7/22 下午 | **MySQL 没装，项目跑不起来**：一开始写了 MySQL 连接，本地没装 MySQL 就一直报连接拒绝 | 想让面试官克隆下来就能跑，零配置 | 给 `config.py` 加 `DB_TYPE` 开关，默认 SQLite，想切 MySQL 设环境变量即可 |
+
+### 第二阶段：接口文档优化（7 月 22 日）
+
+| 时间 | 遇到的问题 | 排查过程 | 解决方案 |
+|------|-----------|----------|----------|
+| 7/22 下午 | **Swagger 界面全是英文**："Try it out"、"Execute"、"Responses"……国内面试官看不懂 | FastAPI 的 `swagger_ui_parameters` 文档没提语言设置，试了 `customScriptUrl` 发现 Swagger UI 5.x 不支持 | 自己写了一个 `swagger-zh.js`，用 `MutationObserver` 监听 DOM 变化，把英文标签逐个替换成中文；同时自定义 `/docs` 路由把脚本注入 HTML |
+| 7/22 下午 | **汉化脚本死循环**：`MutationObserver` 修改 DOM 又触发自身，页面卡死 | 发现 `translate()` 修改文本节点 → 触发 observer → 再调 `translate()`，形成死循环 | 翻译前先 `observer.disconnect()`，翻译完再 `observe()`，加 100ms 防抖 |
+
+### 第三阶段：权限控制（7 月 22 日）
+
+| 时间 | 遇到的问题 | 排查过程 | 解决方案 |
+|------|-----------|----------|----------|
+| 7/22 晚上 | **任何人都能删任何人的数据**：发现不同用户登录后能看到所有林地，点了删除就真删了 | 检查代码，`delete()` 和 `update()` 没做任何身份校验，`role` 字段存了但完全是摆设 | 在 `forest_land_service.py` 加 `_check_permission()`：管理员全放行，普通用户对比 `land.created_by == user_id` |
+| 7/22 晚上 | **admin 账号角色是 USER 不是 ADMIN**：用 admin 登录测试，删别人的林地还是 403 | `init.sql` 里写了 `INSERT admin role='ADMIN'`，但 SQLite 走的是 SQLAlchemy `create_all`，init.sql 根本没执行 | 在 `main.py` 的 `on_startup` 里加了种子逻辑：查无 admin 就建一个，role 不对就修成 ADMIN |
+| 7/22 晚上 | **前端删别人林地只显示红色无错误信息**：userB 删 userA 的林地，弹了红框但里面没文字 | FastAPI 返回的 403 格式是 `{code:403, message:"无权删除..."}`，但 Pydantic 校验失败时返回的是 `{detail:[{msg:...}]}`，格式不一样，前端 `showMsg()` 只读了 `res.message` | 改 `api()` 函数统一处理：遇到 `detail` 数组就提取 `msg` 拼成字符串，转成 `{code, message}` 格式再返回 |
+
+### 第四阶段：前端页面（7 月 22 日）
+
+| 时间 | 遇到的问题 | 排查过程 | 解决方案 |
+|------|-----------|----------|----------|
+| 7/22 晚上 | **FastAPI 挂载顺序导致静态文件 404**：`/static/` 挂载在路由注册之后，浏览器访问 `/static/index.html` 返回 404 | FastAPI 的路由匹配是"先挂载先匹配"，`/docs` 自定义路由注册后，后面的 mount 可能被前面的 catch-all 拦截 | 把 `app.mount("/static", ...)` 挪到 `app.include_router(...)` 之前 |
+| 7/22 晚上 | **前端登录后需要刷新才显示管理界面**：`handleLogin` 成功后 `showMain()` 执行了但看不到效果 | CSS 里 `#mainContent` 默认 `display:none`，JS 里改成了 `style.display='block'`，但前面的 `loginPage` 只是加了 `hidden` class，DOM 渲染顺序问题 | `showMain` 里把 `loginPage` 加上 `hidden`、`mainContent` 设 `display:block`，确保互斥 |
+
+---
+
+> 💡 **面试话术提示**：被问到"项目中遇到过什么困难"时，从上表挑 2-3 个有技术深度的讲——比如"Swagger 汉化的 DOM 死循环"或"权限校验从无到有的设计过程"，比简单说"我做了一个 CRUD 项目"有说服力得多。
 
 ---
 
