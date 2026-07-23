@@ -288,7 +288,7 @@ forest-backend/
 │   │   ├── user.py
 │   │   ├── forest_land.py
 │   │   └── forest_image.py
-│   ├── routers/                 ← 路由控制器（15个接口）
+│   ├── routers/                 ← 路由控制器（19个接口）
 │   │   ├── user.py
 │   │   ├── forest_land.py
 │   │   ├── forest_image.py
