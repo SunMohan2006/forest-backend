@@ -13,7 +13,7 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
 from app.database import engine, Base
 from app.config import settings
-from app.routers import user, forest_land, forest_image, statistics
+from app.routers import user, forest_land, forest_image, statistics, log
 
 # ── 创建应用（禁用默认 /docs，改用自定义路由注入中文汉化） ──
 app = FastAPI(
@@ -62,6 +62,7 @@ app.include_router(user.router)
 app.include_router(forest_land.router)
 app.include_router(forest_image.router)
 app.include_router(statistics.router)
+app.include_router(log.router)
 
 # ── 挂载上传文件目录 ──
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)

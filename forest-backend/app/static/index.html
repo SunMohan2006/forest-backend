@@ -224,6 +224,11 @@ async function api(path, method='GET', body=null) {
   if (body) opts.body = JSON.stringify(body);
   try {
     const res = await fetch(API + path, opts);
+    // 401 / 403：token 过期或无权限，自动退出
+    if (res.status === 401 || res.status === 403) {
+      logout();
+      return {code: res.status, message: '登录已过期，请重新登录'};
+    }
     const data = await res.json();
     // FastAPI 422 验证错误：统一转成 {code, message} 格式
     if (!data.code && data.detail) {
@@ -433,7 +438,10 @@ async function loadImages() {
   if (!res.data||!res.data.length) { grid.innerHTML='<p style="color:#999;text-align:center;grid-column:1/-1">暂无图片，点击上方区域上传</p>'; return; }
   grid.innerHTML = res.data.map(img => {
     const coords = (img.latitude && img.longitude) ? `📍${img.latitude},${img.longitude}` : '';
-    return `<div style="text-align:center"><img src="${img.image_url}" title="${img.original_name}" onclick="window.open('${img.image_url}')"><div style="font-size:11px;color:#999;margin-top:2px">${coords}</div></div>`;
+    return `<div style="text-align:center;position:relative">
+      <img src="${img.image_url}" title="${img.original_name}" onclick="window.open('${img.image_url}')">
+      <button onclick="deleteImage(${img.id})" style="position:absolute;top:2px;right:2px;background:rgba(207,19,34,0.8);color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:11px;padding:2px 6px">✕</button>
+      <div style="font-size:11px;color:#999;margin-top:2px">${coords}</div></div>`;
   }).join('');
 }
 
@@ -459,6 +467,13 @@ async function changeUserRole(userId, newRole, username) {
   if (!confirm(`确定将 ${username} 的角色改为 ${newRole==='ADMIN'?'管理员':'普通用户'}？`)) return;
   const res = await api(`/api/user/${userId}/role?new_role=${newRole}`, 'PUT');
   if (res.code === 200) { loadUsers(); } else { alert(res.message); }
+}
+
+async function deleteImage(imageId) {
+  if (!confirm('确定删除该图片？删除后不可恢复！')) return;
+  const res = await api(`/api/forest-image/${imageId}`, 'DELETE');
+  if (res.code === 200) { loadImages(); loadData(); }
+  else alert(res.message);
 }
 
 async function uploadImage() {

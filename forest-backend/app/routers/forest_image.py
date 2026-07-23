@@ -1,5 +1,5 @@
 """
-遥感图片路由 — 上传、查看列表（需登录）
+遥感图片路由 — 上传、查看列表、删除（需登录）
 """
 from fastapi import APIRouter, Depends, UploadFile, File, Query
 from sqlalchemy.orm import Session
@@ -65,3 +65,20 @@ def list_images(land_id: int, db: Session = Depends(get_db),
         "longitude": float(img.longitude) if img.longitude else None,
         "uploaded_at": str(img.uploaded_at),
     } for img in images])
+
+
+@router.delete("/{image_id}", summary="删除遥感图片",
+               description="""
+**功能说明**：删除一张遥感图片（需权限：图片所属林地的创建者或管理员）。
+
+**注意**：同时删除本地文件和数据库记录，不可恢复。
+""")
+def delete_image(image_id: int, db: Session = Depends(get_db),
+                 current_user: dict = Depends(get_current_user)):
+    try:
+        image = forest_image_service.delete(db, image_id, current_user["user_id"], current_user["role"])
+        return success(data={"id": image.id, "original_name": image.original_name}, message="删除成功")
+    except ValueError as e:
+        return error(code=404, message=str(e))
+    except PermissionError as e:
+        return error(code=403, message=str(e))

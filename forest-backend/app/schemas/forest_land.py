@@ -2,7 +2,7 @@
 林地相关 — 请求体 / 响应体校验模型
 """
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime
 
 
@@ -11,7 +11,8 @@ class ForestLandCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="林地名称")
     area: Optional[float] = Field(None, gt=0, description="面积（亩）")
     location: Optional[str] = Field(None, max_length=255, description="地理位置")
-    land_type: Optional[str] = Field(None, max_length=50, description="类型: 用材林/防护林/经济林/薪炭林/特用林")
+    land_type: Optional[Literal["用材林", "防护林", "经济林", "薪炭林", "特用林"]] = Field(
+        None, description="类型: 用材林/防护林/经济林/薪炭林/特用林")
     tree_species: Optional[str] = Field(None, max_length=100, description="主要树种，如落叶松、杉木、杨树")
     planting_year: Optional[int] = Field(None, ge=1950, le=2099, description="种植年份")
     canopy_density: Optional[float] = Field(None, ge=0, le=1, description="郁闭度 (0~1)")
@@ -26,12 +27,13 @@ class ForestLandUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100, description="林地名称")
     area: Optional[float] = Field(None, gt=0, description="面积（亩）")
     location: Optional[str] = Field(None, max_length=255, description="地理位置")
-    land_type: Optional[str] = Field(None, max_length=50, description="类型")
+    land_type: Optional[Literal["用材林", "防护林", "经济林", "薪炭林", "特用林"]] = Field(
+        None, description="林地类型")
     tree_species: Optional[str] = Field(None, max_length=100, description="主要树种")
     planting_year: Optional[int] = Field(None, ge=1950, le=2099, description="种植年份")
     canopy_density: Optional[float] = Field(None, ge=0, le=1, description="郁闭度")
     description: Optional[str] = Field(None, description="描述")
-    status: Optional[str] = Field(None, description="状态: ACTIVE/INACTIVE")
+    status: Optional[Literal["ACTIVE", "INACTIVE"]] = Field(None, description="状态: ACTIVE/INACTIVE")
 
 
 class ForestLandResponse(BaseModel):
