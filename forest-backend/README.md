@@ -365,6 +365,7 @@ forest-backend/
 | 7/23 上午 | **操作日志在写但没处看**：系统默默记录了大量操作日志，但没有接口暴露——面试官看不到"审计"能力 | 日志是管理员功能，不需要复杂查询，分页返回即可 | 新增 `GET /api/log/list` 接口（管理员权限），直接查 `operation_log` 表按时间倒序分页返回 |
 | 7/23 上午 | **Token 过期后前端没有反应**：登录态失效后调用接口返回 401，但前端没有自动跳回登录页——用户看到的是红框但不知道发生了什么 | 在 `api()` 函数的 fetch 之后检查 `res.status`，401/403 就自动调 `logout()` 清空状态 | 在 fetch 返回后加判断：`if (res.status === 401 \|\| res.status === 403) { logout(); }` |
 | 7/23 上午 | **接口参数校验不够严格**：`land_type` 和 `status` 字段是普通字符串，可以填任意值如"野生动物园"——虽然前端下拉框限制了，但后端接口直接调 API 可以绕过 | Pydantic 支持 `Literal` 类型，可以限定枚举值 | 将 `land_type` 约束为 `Literal["用材林","防护林","经济林","薪炭林","特用林"]`，`status` 约束为 `Literal["ACTIVE","INACTIVE"]`，不合法的值 FastAPI 直接返回 422 |
+| 7/23 上午 | **SQLite 下更新林地后 `updated_at` 不会变**：修改林地信息后刷新列表，时间还是旧的——排查发现 SQLite 不支持 MySQL 的 `ON UPDATE CURRENT_TIMESTAMP`，SQLAlchemy 的 `onupdate=func.now()` 在 SQLite 下静默失效 | 在 `forest_land_service.py` 的 `update()` 中，commit 前手动加 `land.updated_at = func.now()` | 这个问题很隐蔽——不报错、不崩溃，但数据不对。发现它靠的是"修改→刷新→时间没变"的直觉 |
 | 7/23 上午 | **项目展示效果不够直观**：README 全是文字和表格，面试官打开 GitHub 第一眼看不到项目的"活"样子 | 前端、Swagger、林业字段、管理员面板各截一张图 | 新建 `screenshots/` 目录，放入 6 张截图，README 项目简介下用表格展示 |
 
 ---

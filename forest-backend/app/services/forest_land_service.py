@@ -45,6 +45,9 @@ def update(db: Session, land_id: int, data: dict, user_id: int, role: str) -> Fo
         if value is not None:
             setattr(land, key, value)
 
+    # SQLite 不支持 ON UPDATE CURRENT_TIMESTAMP，需手动设置
+    land.updated_at = func.now()
+
     db.commit()
     db.refresh(land)
 
